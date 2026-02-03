@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/lib/generated/prisma/client";
 
 const isSQLInjectionAttempt = (input: string): boolean => {
   const sqlKeywords = [
@@ -90,13 +91,12 @@ export async function POST(request: NextRequest) {
     // VULNERABLE: Using raw SQL with direct header value concatenation
     // This allows SQL injection through the X-Forwarded-For header
     const id = crypto.randomUUID();
-    const query = `
-      INSERT INTO visitor_logs (id, ip, userAgent, path, sessionId, createdAt)
-      VALUES ('${id}', '${ip}', '${userAgent.replace(/'/g, "''")}', '${visitPath.replace(/'/g, "''")}', ${visitorSessionId ? `'${visitorSessionId}'` : "NULL"}, datetime('now'))
-    `;
 
     try {
-      await prisma.$queryRawUnsafe(query);
+      await prisma.$queryRaw(Prisma.sql`
+      INSERT INTO visitor_logs (id, ip, userAgent, path, sessionId, createdAt)
+      VALUES (${id}, ${ip}, ${userAgent}, ${visitPath}, ${visitorSessionId}, datetime('now'))
+    `);
     } catch (error) {
       // Log error but don't expose details
       console.error("Error executing tracking query:", error);
